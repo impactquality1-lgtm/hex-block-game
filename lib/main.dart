@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'hex.dart';
@@ -44,6 +46,7 @@ class GamePage extends StatefulWidget {
 class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin {
   final HexGame game = HexGame();
   int best = 0;
+  final AudioPlayer _clearPlayer = AudioPlayer();
   late final AnimationController _clearController = AnimationController(vsync: this, duration: const Duration(milliseconds: 950));
   late final Animation<double> _clearScale = TweenSequence<double>([
     TweenSequenceItem(tween: Tween(begin: 0.4, end: 1.35), weight: 25),
@@ -58,7 +61,52 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
   @override
   void dispose() {
     _clearController.dispose();
+    _clearPlayer.dispose();
     super.dispose();
+  }
+  Uint8List _clearSoundWav(bool combo) {
+    const sampleRate = 22050;
+    const noteSeconds = 0.14;
+    final notes = combo ? [523.25, 659.25, 783.99, 1046.50, 1318.51] : [523.25, 659.25, 783.99, 1046.50];
+    final samplesPerNote = (sampleRate * noteSeconds).round();
+    final pcm = <int>[];
+    for (var n = 0; n < notes.length; n++) {
+      for (var i = 0; i < samplesPerNote; i++) {
+        final t = i / sampleRate;
+        final progress = i / samplesPerNote;
+        final envelope = progress < 0.05 ? progress / 0.05 : 1.0 - 0.6 * ((progress - 0.05) / 0.95);
+        final value = math.sin(2 * math.pi * notes[n] * t) * envelope * 0.5;
+        final sample = (value * 32767).round().clamp(-32768, 32767);
+        pcm.add(sample & 0xFF);
+        pcm.add((sample >> 8) & 0xFF);
+      }
+    }
+    final dataSize = pcm.length;
+    final header = ByteData(44);
+    void writeString(int offset, String s) {
+      for (var i = 0; i < s.length; i++) {
+        header.setUint8(offset + i, s.codeUnitAt(i));
+      }
+    }
+    writeString(0, 'RIFF');
+    header.setUint32(4, 36 + dataSize, Endian.little);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    header.setUint32(16, 16, Endian.little);
+    header.setUint16(20, 1, Endian.little);
+    header.setUint16(22, 1, Endian.little);
+    header.setUint32(24, sampleRate, Endian.little);
+    header.setUint32(28, sampleRate * 2, Endian.little);
+    header.setUint16(32, 2, Endian.little);
+    header.setUint16(34, 16, Endian.little);
+    writeString(36, 'data');
+    header.setUint32(40, dataSize, Endian.little);
+    return Uint8List.fromList([...header.buffer.asUint8List(), ...pcm]);
+  }
+  Future<void> _playClearSound(bool combo) async {
+    try {
+      await _clearPlayer.play(BytesSource(_clearSoundWav(combo)));
+    } catch (_) {}
   }
   int? selectedTrayIndex;
   int? draggingTrayIndex;
@@ -131,6 +179,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       if (cleared && game.gameOver && game.score > best) best = game.score;
     });
     if (cleared && game.isClearing) {
+      _playClearSound(game.clearingLines > 1);
       _clearController.forward(from: 0);
       Future.delayed(const Duration(milliseconds: 950), () {
         if (!mounted || !game.isClearing) return;
