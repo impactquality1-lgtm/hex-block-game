@@ -1,0 +1,17 @@
+# Flutter / Dart
+.dart_tool/
+build/
+.packages
+.pub-cache/
+.pub/
+
+# macOS
+.DS_Store
+
+# Backups (not part of the game)
+lib_backup/
+
+# IDE
+.idea/
+.vscode/
+*.iml

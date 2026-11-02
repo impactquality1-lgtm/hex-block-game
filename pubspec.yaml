@@ -1,0 +1,19 @@
+name: hex_block_game
+description: A hex-grid block puzzle game. Drag pieces onto the board, fill a full line in any of the three hex directions, and it clears.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
