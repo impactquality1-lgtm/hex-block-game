@@ -99,6 +99,14 @@ class HexGame {
   bool gameOver = false;
   String? message;
 
+  /// Cells currently playing their clear animation. They stay on the board
+  /// (flashing) until [finishClear] removes them, so the UI can celebrate
+  /// the clear before the cells disappear.
+  Set<Axial> clearingCells = {};
+  int clearingPoints = 0;
+  int clearingLines = 0;
+  bool get isClearing => clearingCells.isNotEmpty;
+
   final math.Random _random = math.Random();
 
   HexGame() {
@@ -111,6 +119,9 @@ class HexGame {
     linesCleared = 0;
     gameOver = false;
     message = null;
+    clearingCells = {};
+    clearingPoints = 0;
+    clearingLines = 0;
     refillTray();
   }
 
@@ -146,9 +157,14 @@ class HexGame {
   }
 
   /// Place a tray piece. Returns false if the placement is illegal.
+  ///
+  /// When a placement completes one or more lines, the cleared cells are
+  /// NOT removed immediately: they are kept in [clearingCells] so the UI
+  /// can animate them, and the caller must call [finishClear] when the
+  /// animation ends. Input should be ignored while [isClearing] is true.
   bool place(int trayIndex, Axial anchor) {
     final piece = tray[trayIndex];
-    if (piece == null || gameOver || !canPlace(piece, anchor)) {
+    if (piece == null || gameOver || isClearing || !canPlace(piece, anchor)) {
       return false;
     }
     for (final offset in piece.cells) {
@@ -165,21 +181,38 @@ class HexGame {
       }
     }
     if (cleared.isNotEmpty) {
-      for (final cell in cleared) {
-        board.remove(cell);
-      }
-      linesCleared += linesHit;
-      score += 100 * linesHit + (linesHit > 1 ? 50 * (linesHit - 1) : 0);
+      clearingCells = cleared;
+      clearingLines = linesHit;
+      clearingPoints = 100 * linesHit + (linesHit > 1 ? 50 * (linesHit - 1) : 0);
+      score += clearingPoints;
       message = linesHit > 1 ? 'Combo! $linesHit lines!' : 'Line cleared!';
-    } else {
-      message = null;
+      return true;
     }
+    message = null;
     if (tray.every((p) => p == null)) {
       refillTray();
     } else {
       _checkGameOver();
     }
     return true;
+  }
+
+  /// End a line-clear animation: remove the flashing cells, count the
+  /// lines, then refill the tray / check for game over as usual.
+  void finishClear() {
+    if (clearingCells.isEmpty) return;
+    for (final cell in clearingCells) {
+      board.remove(cell);
+    }
+    linesCleared += clearingLines;
+    clearingCells = {};
+    clearingPoints = 0;
+    clearingLines = 0;
+    if (tray.every((p) => p == null)) {
+      refillTray();
+    } else {
+      _checkGameOver();
+    }
   }
 
   void _checkGameOver() {

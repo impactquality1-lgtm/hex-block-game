@@ -41,9 +41,25 @@ class GamePage extends StatefulWidget {
   State<GamePage> createState() => _GamePageState();
 }
 
-class _GamePageState extends State<GamePage> {
+class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin {
   final HexGame game = HexGame();
   int best = 0;
+  late final AnimationController _clearController = AnimationController(vsync: this, duration: const Duration(milliseconds: 950));
+  late final Animation<double> _clearScale = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 0.4, end: 1.35), weight: 25),
+    TweenSequenceItem(tween: Tween(begin: 1.35, end: 1.0), weight: 20),
+    TweenSequenceItem(tween: ConstantTween(1.0), weight: 35),
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15), weight: 20),
+  ]).animate(_clearController);
+  late final Animation<double> _clearOpacity = TweenSequence<double>([
+    TweenSequenceItem(tween: ConstantTween(1.0), weight: 75),
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 25),
+  ]).animate(_clearController);
+  @override
+  void dispose() {
+    _clearController.dispose();
+    super.dispose();
+  }
   int? selectedTrayIndex;
   int? draggingTrayIndex;
   Offset? dragPosition;
@@ -108,12 +124,22 @@ class _GamePageState extends State<GamePage> {
   }
 
   void _place(int trayIndex, Axial anchor) {
+    if (game.isClearing) return;
+    final cleared = game.place(trayIndex, anchor);
     setState(() {
       selectedTrayIndex = null;
-      if (game.place(trayIndex, anchor)) {
-        if (game.gameOver && game.score > best) best = game.score;
-      }
+      if (cleared && game.gameOver && game.score > best) best = game.score;
     });
+    if (cleared && game.isClearing) {
+      _clearController.forward(from: 0);
+      Future.delayed(const Duration(milliseconds: 950), () {
+        if (!mounted || !game.isClearing) return;
+        setState(() {
+          game.finishClear();
+          if (game.gameOver && game.score > best) best = game.score;
+        });
+      });
+    }
   }
 
   void _onBoardTap(TapUpDetails details) {
@@ -166,16 +192,21 @@ class _GamePageState extends State<GamePage> {
                 height: 22,
                 child: Text(game.message ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
-              GestureDetector(
-                onTapUp: _onBoardTap,
-                child: Container(
-                  key: _boardKey,
-                  width: _boardWidth,
-                  height: boardHeight,
-                  child: CustomPaint(
-                    painter: _BoardPainter(game: game, layout: _layout, center: _boardCenter(), ghostAnchor: ghostAnchor, ghostPiece: draggingPiece, ghostValid: ghostValid),
-                  ),
-                ),
+              AnimatedBuilder(
+                animation: _clearController,
+                builder: (context, child) {
+                  return GestureDetector(
+                    onTapUp: _onBoardTap,
+                    child: Container(
+                      key: _boardKey,
+                      width: _boardWidth,
+                      height: boardHeight,
+                      child: CustomPaint(
+                        painter: _BoardPainter(game: game, layout: _layout, center: _boardCenter(), ghostAnchor: ghostAnchor, ghostPiece: draggingPiece, ghostValid: ghostValid, clearingCells: game.clearingCells, clearFlash: _clearController.value),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               const Text('Drag a piece onto the board, or tap a piece then tap a cell.', style: TextStyle(color: Colors.white70)),
@@ -203,6 +234,31 @@ class _GamePageState extends State<GamePage> {
                     height: 90,
                     child: CustomPaint(painter: _PiecePainter(draggingPiece, 13, ghostValid: true)),
                   ),
+                ),
+              ),
+            ),
+          if (game.isClearing)
+            IgnorePointer(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _clearController,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _clearOpacity.value,
+                      child: Transform.scale(
+                        scale: _clearScale.value,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.star, color: Colors.amber, size: 32), SizedBox(width: 4), Icon(Icons.star, color: Colors.amber, size: 40), SizedBox(width: 4), Icon(Icons.star, color: Colors.amber, size: 32)]),
+                            const SizedBox(height: 4),
+                            Text('+${game.clearingPoints}', style: TextStyle(fontSize: 56, fontWeight: FontWeight.w900, color: Colors.amber.shade300, shadows: const [Shadow(blurRadius: 12, color: Colors.black87, offset: Offset(0, 3))])),
+                            Text(game.clearingLines > 1 ? 'Combo! ${game.clearingLines} lines!' : 'Line cleared!', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))])),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -295,7 +351,9 @@ class _BoardPainter extends CustomPainter {
   final Axial? ghostAnchor;
   final Piece? ghostPiece;
   final bool ghostValid;
-  _BoardPainter({required this.game, required this.layout, required this.center, required this.ghostAnchor, required this.ghostPiece, required this.ghostValid});
+  final Set<Axial> clearingCells;
+  final double clearFlash;
+  _BoardPainter({required this.game, required this.layout, required this.center, required this.ghostAnchor, required this.ghostPiece, required this.ghostValid, this.clearingCells = const {}, this.clearFlash = 0});
   @override
   void paint(Canvas canvas, Size size) {
     final emptyFill = Paint()..color = const Color(0xFF263238);
@@ -305,7 +363,14 @@ class _BoardPainter extends CustomPainter {
       final cellCenter = Offset(center.dx + p.x, center.dy + p.y);
       final colorIndex = game.board[cell];
       if (colorIndex != null) {
-        canvas.drawPath(_hexPath(cellCenter, layout.size * 0.92), Paint()..color = pieceColors[colorIndex % pieceColors.length]);
+        var color = pieceColors[colorIndex % pieceColors.length];
+        var cellSize = layout.size * 0.92;
+        if (clearingCells.contains(cell)) {
+          final pulse = 0.5 + 0.5 * math.sin(clearFlash * math.pi * 6);
+          color = Color.lerp(color, Colors.white, 0.45 + 0.4 * pulse)!;
+          cellSize = layout.size * (0.92 + 0.12 * pulse);
+        }
+        canvas.drawPath(_hexPath(cellCenter, cellSize), Paint()..color = color);
       } else {
         canvas.drawPath(_hexPath(cellCenter, layout.size * 0.92), emptyFill);
         canvas.drawPath(_hexPath(cellCenter, layout.size * 0.92), emptyStroke);
