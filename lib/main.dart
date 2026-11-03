@@ -436,8 +436,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     return Stack(
                       alignment: Alignment.center,
                       children: [
-                        if (lines >= 3) ..._burstStars(t, 12, 110),
-                        if (lines == 2) ..._burstStars(t, 6, 70),
+                        for (var s = 0; s < lines; s++) if (t >= s * 0.15) ...[..._burstStars((t - s * 0.15) / 0.85, 14, 140), ..._burstStars(((t - s * 0.15) / 0.85 * 1.4 - 0.2).clamp(0.0, 1.0), 10, 90)],
                         Opacity(
                           opacity: _clearOpacity.value,
                           child: Transform.scale(
