@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'hex.dart';
+import 'sounds.dart';
 
 void main() => runApp(const HexBlocksApp());
 
@@ -31,11 +32,72 @@ class HexBlocksApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const GamePage(),
+      home: const SplashPage(),
     );
   }
 }
 
+class SplashPage extends StatefulWidget {
+  const SplashPage({super.key});
+  @override
+  State<SplashPage> createState() => _SplashPageState();
+}
+class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  final AudioPlayer _splashPlayer = AudioPlayer();
+  bool _navigated = false;
+  @override
+  void initState() {
+    super.initState();
+    _splashPlayer.play(BytesSource(buildChimeWav([261.63, 329.63, 392.00, 523.25, 659.25, 783.99], noteSeconds: 0.16))).catchError((_) {});
+    _controller.forward();
+    Future.delayed(const Duration(milliseconds: 2400), _goToGame);
+  }
+  @override
+  void dispose() {
+    _splashPlayer.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+  void _goToGame() {
+    if (!mounted || _navigated) return;
+    _navigated = true;
+    Navigator.of(context).pushReplacement(PageRouteBuilder(transitionDuration: const Duration(milliseconds: 400), pageBuilder: (context, animation, secondaryAnimation) => const GamePage(), transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child)));
+  }
+  @override
+  Widget build(BuildContext context) {
+    const hexPiece = Piece([Axial(0, 0), Axial(1, 0), Axial(0, 1), Axial(-1, 1), Axial(0, -1), Axial(1, -1), Axial(-1, 0)], 1);
+    return GestureDetector(
+      onTap: _goToGame,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF102027),
+        body: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final t = _controller.value;
+            final titleScale = Curves.elasticOut.transform((t * 1.8).clamp(0.0, 1.0));
+            final hexScale = Curves.elasticOut.transform(((t - 0.15) * 1.6).clamp(0.0, 1.0));
+            final subOpacity = ((t - 0.45) * 2.5).clamp(0.0, 1.0);
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Transform.scale(scale: hexScale, child: SizedBox(width: 150, height: 150, child: CustomPaint(painter: _PiecePainter(hexPiece, 20)))),
+                  const SizedBox(height: 16),
+                  Transform.scale(scale: titleScale, child: const Text('HEX BLOCKS', style: TextStyle(fontSize: 44, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.white, shadows: [Shadow(blurRadius: 16, color: Colors.tealAccent, offset: Offset(0, 0))]))),
+                  const SizedBox(height: 8),
+                  Opacity(opacity: subOpacity, child: const Text('Fill lines. Clear them. Score big.', style: TextStyle(fontSize: 18, color: Colors.white70))),
+                  const SizedBox(height: 48),
+                  const Text('Tap to skip', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 class GamePage extends StatefulWidget {
   const GamePage({super.key});
 
