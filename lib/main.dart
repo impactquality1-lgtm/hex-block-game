@@ -119,7 +119,7 @@ class GamePage extends StatefulWidget {
   State<GamePage> createState() => _GamePageState();
 }
 
-class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin {
+class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   final HexGame game = HexGame();
   int best = 0;
   final AudioPlayer _clearPlayer = AudioPlayer();
@@ -134,9 +134,11 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
     TweenSequenceItem(tween: ConstantTween(1.0), weight: 75),
     TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 25),
   ]).animate(_clearController);
+  late final AnimationController _wordController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
   @override
   void dispose() {
     _clearController.dispose();
+    _wordController.dispose();
     _clearPlayer.dispose();
     super.dispose();
   }
@@ -183,6 +185,21 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
     try {
       await _clearPlayer.play(BytesSource(_clearSoundWav(lines)));
     } catch (_) {}
+  }
+  Uint8List _wordSoundWav() {
+    const sampleRate = 22050;
+    const noteSeconds = 0.07;
+    final notes = [1567.98, 2093.00, 2637.00, 3135.96, 3520.00];
+    final samplesPerNote = (sampleRate * noteSeconds).round();
+    final pcm = <int>[];
+    for (var n = 0; n < notes.length; n++) { for (var i = 0; i < samplesPerNote; i++) { final tt = i / sampleRate; final progress = i / samplesPerNote; final envelope = progress < 0.05 ? progress / 0.05 : 1.0 - 0.6 * ((progress - 0.05) / 0.95); final sample = (math.sin(2 * math.pi * notes[n] * tt) * envelope * 0.5 * 32767).round().clamp(-32768, 32767); pcm.add(sample & 0xFF); pcm.add((sample >> 8) & 0xFF); } }
+    final header = ByteData(44);
+    void ws(int o, String s) { for (var i = 0; i < s.length; i++) header.setUint8(o + i, s.codeUnitAt(i)); }
+    ws(0, 'RIFF'); header.setUint32(4, 36 + pcm.length, Endian.little); ws(8, 'WAVE'); ws(12, 'fmt '); header.setUint32(16, 16, Endian.little); header.setUint16(20, 1, Endian.little); header.setUint16(22, 1, Endian.little); header.setUint32(24, sampleRate, Endian.little); header.setUint32(28, sampleRate * 2, Endian.little); header.setUint16(32, 2, Endian.little); header.setUint16(34, 16, Endian.little); ws(36, 'data'); header.setUint32(40, pcm.length, Endian.little);
+    return Uint8List.fromList([...header.buffer.asUint8List(), ...pcm]);
+  }
+  Future<void> _playWordSound() async {
+    try { await _clearPlayer.play(BytesSource(_wordSoundWav())); } catch (_) {}
   }
   List<WordScore> _wordBanner = [];
   bool _wordBannerVisible = false;
@@ -258,6 +275,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       if (cleared && game.gameOver && game.score > best) best = game.score;
     });
     if (game.foundWords.isNotEmpty) {
+      _playWordSound();
+      _wordController.forward(from: 0);
       final bannerId = ++_wordBannerId;
       setState(() { _wordBanner = List.of(game.foundWords); _wordBannerVisible = true; });
       Future.delayed(const Duration(milliseconds: 1400), () { if (!mounted || bannerId != _wordBannerId) return; setState(() { _wordBannerVisible = false; }); });
@@ -354,6 +373,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                 height: 22,
                 child: Text(game.message ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
+              Stack(alignment: Alignment.center, children: [
               AnimatedBuilder(
                 animation: _clearController,
                 builder: (context, child) {
@@ -370,6 +390,9 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                   );
                 },
               ),
+              if (_wordBanner.isNotEmpty) IgnorePointer(child: AnimatedBuilder(animation: _wordController, builder: (context, child) { final wt = _wordController.value; return Stack(alignment: Alignment.center, children: [..._burstStars(wt, 14, 140), ..._burstStars((wt * 1.4 - 0.2).clamp(0.0, 1.0), 10, 90), AnimatedOpacity(opacity: _wordBannerVisible ? 1.0 : 0.0, duration: const Duration(milliseconds: 400), child: TweenAnimationBuilder<double>(key: ValueKey(_wordBannerId), tween: Tween(begin: 0.4, end: 1.0), duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, builder: (context, scale, child) { return Transform.scale(scale: scale, child: child); }, child: Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.lightGreenAccent, width: 2)), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('WORD BONUS!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.lightGreenAccent)), for (final word in _wordBanner) Text('${word.word.toUpperCase()}  +${word.points}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white))]))))]); }, ), ),
+              ],
+              ),
               const SizedBox(height: 12),
               const Text('Drag a piece onto the board, tap a piece then tap a cell. Only the middle piece (blue outline) can rotate — double-tap it.', style: TextStyle(color: Colors.white70)),
               const SizedBox(height: 8),
@@ -380,7 +403,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
               const Spacer(),
               const Padding(
                 padding: EdgeInsets.only(bottom: 16),
-                child: Text('Fill a full line in any of the 3 hex directions to clear it.', style: TextStyle(color: Colors.white54)),
+                child: Text('Fill a full line in any of the 3 hex directions to clear it. Create words in any direction for points.', style: TextStyle(color: Colors.white54)),
               ),
             ],
           ),
@@ -440,8 +463,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                 ),
               ),
             ),
-          if (_wordBanner.isNotEmpty)
-            IgnorePointer(child: Align(alignment: const Alignment(0, 0.55), child: AnimatedScale(scale: _wordBannerVisible ? 1.0 : 0.4, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: AnimatedOpacity(opacity: _wordBannerVisible ? 1.0 : 0.0, duration: const Duration(milliseconds: 400), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('WORD BONUS!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.lightGreenAccent, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))])), for (final word in _wordBanner) Text('${word.word.toUpperCase()}  +${word.points}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))]))]))))), 
+
           if (game.gameOver)
             Container(
               color: Colors.black54,
