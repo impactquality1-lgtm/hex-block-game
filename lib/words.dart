@@ -1,7 +1,7 @@
 /// Starter English dictionary for the word twist: common words only,
 /// 3 letters and up. Words are checked in lowercase. This is a curated
 /// list, not an exhaustive dictionary, and can be expanded over time.
-const Set<String> englishWords = {
+final Set<String> englishWords = {
   // 3-letter words.
   'ace', 'act', 'add', 'age', 'ago', 'aid', 'air', 'ale', 'all', 'and',
   'ant', 'ape', 'apt', 'arc', 'are', 'arm', 'art', 'ash', 'ask', 'ate',

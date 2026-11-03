@@ -107,6 +107,7 @@ class HexGame {
   final Map<Axial, int> board = {};
   final Map<Axial, String> letters = {};
   List<WordScore> foundWords = [];
+  int wordsCreated = 0;
   final Set<String> scoredWordKeys = {};
   List<Piece?> tray = [null, null, null];
   int score = 0;
@@ -133,6 +134,7 @@ class HexGame {
     letters.clear();
     foundWords = [];
     scoredWordKeys.clear();
+    wordsCreated = 0;
     score = 0;
     linesCleared = 0;
     gameOver = false;
@@ -188,6 +190,7 @@ class HexGame {
     final newSet = newCells.toSet();
     final seenSegments = <String>{};
     final results = <WordScore>[];
+    final scoredThisCall = <String>{};
     for (var d = 0; d < dirs.length; d++) {
       final step = dirs[d];
       final back = Axial(-step.q, -step.r);
@@ -200,21 +203,29 @@ class HexGame {
         while (board.containsKey(cur)) { segCells.add(cur); cur = cur + step; }
         if (segCells.length < 3) continue;
         final segStr = segCells.map((c) => letters[c] ?? '').join();
-        for (var len = segStr.length; len >= 3; len--) {
-          var found = false;
-          for (var i = 0; i + len <= segStr.length; i++) {
-            final subCells = segCells.sublist(i, i + len);
-            if (!subCells.any(newSet.contains)) continue;
-            final word = segStr.substring(i, i + len).toLowerCase();
-            if (!englishWords.contains(word)) continue;
-            final key = '${segCells[i].q},${segCells[i].r}:$d:$len:$word';
-            if (scoredWordKeys.contains(key)) continue;
-            scoredWordKeys.add(key);
-            results.add(WordScore(word, _wordPoints(len), subCells));
-            found = true;
-            break;
+        final views = [(segCells, segStr), (segCells.reversed.toList(), segStr.split('').reversed.join())];
+        for (final view in views) {
+          final viewCells = view.$1;
+          final viewStr = view.$2;
+          for (var len = viewStr.length; len >= 3; len--) {
+            var found = false;
+            for (var i = 0; i + len <= viewStr.length; i++) {
+              final subCells = viewCells.sublist(i, i + len);
+              if (!subCells.any(newSet.contains)) continue;
+              final word = viewStr.substring(i, i + len).toLowerCase();
+              if (!englishWords.contains(word)) continue;
+              final cellKey = subCells.map((c) => '${c.q},${c.r}').join(';') + ':$word';
+              if (scoredThisCall.contains(cellKey)) { found = true; break; }
+              final key = '${subCells[i].q},${subCells[i].r}:$d:$len:$word';
+              if (scoredWordKeys.contains(key)) continue;
+              scoredWordKeys.add(key);
+              scoredThisCall.add(cellKey);
+              results.add(WordScore(word, _wordPoints(len), subCells));
+              found = true;
+              break;
+            }
+            if (found) break;
           }
-          if (found) break;
         }
       }
     }
@@ -260,6 +271,7 @@ class HexGame {
     tray[trayIndex] = null;
     foundWords = _findWords(placedCells);
     for (final word in foundWords) score += word.points;
+    wordsCreated += foundWords.length;
     final cleared = <Axial>{};
     var linesHit = 0;
     for (final line in lines) {

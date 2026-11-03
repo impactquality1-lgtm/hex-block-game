@@ -94,7 +94,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                   const SizedBox(height: 16),
                   Transform.scale(scale: titleScale, child: const Text('HEX BLOCKS', style: TextStyle(fontSize: 44, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.white, shadows: [Shadow(blurRadius: 16, color: Colors.tealAccent, offset: Offset(0, 0))]))),
                   const SizedBox(height: 8),
-                  Opacity(opacity: subOpacity, child: const Text('Fill lines. Clear them. Score big.', style: TextStyle(fontSize: 18, color: Colors.white70))),
+                  Opacity(opacity: subOpacity, child: const Text('Fill lines. Clear them. Create words! Score big.', style: TextStyle(fontSize: 18, color: Colors.white70))),
                   const SizedBox(height: 48),
                   const Text('Tap to skip', style: TextStyle(color: Colors.white38, fontSize: 13)),
                 ],
@@ -103,7 +103,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                 _splashPopup(t, 0.12, const Alignment(-0.65, -0.65), '+100'),
                 _splashPopup(t, 0.32, const Alignment(0.65, -0.35), 'Combo! 2 lines!'),
                 _splashPopup(t, 0.52, const Alignment(-0.6, 0.45), '+250'),
-                _splashPopup(t, 0.72, const Alignment(0.6, 0.65), '+100'),
+                _splashPopup(t, 0.72, const Alignment(0.6, 0.65), 'Create words!'),
               ],
             );
           },
@@ -345,6 +345,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                   _scoreBox('Best', '$best'),
                   const SizedBox(width: 16),
                   _scoreBox('Lines', '${game.linesCleared}'),
+                  const SizedBox(width: 16),
+                  _scoreBox('Words', '${game.wordsCreated}'),
                 ],
               ),
               const SizedBox(height: 4),
@@ -439,7 +441,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
               ),
             ),
           if (_wordBanner.isNotEmpty)
-            IgnorePointer(child: Align(alignment: const Alignment(0, 0.55), child: AnimatedOpacity(opacity: _wordBannerVisible ? 1.0 : 0.0, duration: const Duration(milliseconds: 400), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('WORD BONUS!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.lightGreenAccent, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))])), for (final word in _wordBanner) Text('${word.word.toUpperCase()}  +${word.points}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))]))])))),
+            IgnorePointer(child: Align(alignment: const Alignment(0, 0.55), child: AnimatedScale(scale: _wordBannerVisible ? 1.0 : 0.4, duration: const Duration(milliseconds: 500), curve: Curves.elasticOut, child: AnimatedOpacity(opacity: _wordBannerVisible ? 1.0 : 0.0, duration: const Duration(milliseconds: 400), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('WORD BONUS!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.lightGreenAccent, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))])), for (final word in _wordBanner) Text('${word.word.toUpperCase()}  +${word.points}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))]))]))))), 
           if (game.gameOver)
             Container(
               color: Colors.black54,
@@ -550,7 +552,7 @@ class _BoardPainter extends CustomPainter {
         canvas.drawPath(_hexPath(cellCenter, cellSize), Paint()..color = color);
         final letter = game.letters[cell];
         if (letter != null) {
-          final tp = TextPainter(text: TextSpan(text: letter, style: TextStyle(fontSize: layout.size * 0.85, fontWeight: FontWeight.bold, color: Colors.white, shadows: const [Shadow(blurRadius: 2, color: Colors.black54, offset: Offset(0, 1))])), textDirection: TextDirection.ltr)..layout();
+          final tp = TextPainter(text: TextSpan(text: letter, style: TextStyle(fontSize: layout.size * 0.85, fontWeight: FontWeight.bold, color: Colors.black, shadows: const [Shadow(blurRadius: 2, color: Colors.white70, offset: Offset(0, 1))])), textDirection: TextDirection.ltr)..layout();
           tp.paint(canvas, Offset(cellCenter.dx - tp.width / 2, cellCenter.dy - tp.height / 2));
         }
       } else {
@@ -599,7 +601,7 @@ class _PiecePainter extends CustomPainter {
       final cellCenter = Offset(offset.dx + p.x, offset.dy + p.y);
       canvas.drawPath(_hexPath(cellCenter, hexSize * 0.92), paint);
       if (piece.letters.length == piece.cells.length) {
-        final tp = TextPainter(text: TextSpan(text: piece.letters[i], style: TextStyle(fontSize: hexSize * 0.85, fontWeight: FontWeight.bold, color: Colors.white, shadows: const [Shadow(blurRadius: 2, color: Colors.black54, offset: Offset(0, 1))])), textDirection: TextDirection.ltr)..layout();
+        final tp = TextPainter(text: TextSpan(text: piece.letters[i], style: TextStyle(fontSize: hexSize * 0.85, fontWeight: FontWeight.bold, color: Colors.black, shadows: const [Shadow(blurRadius: 2, color: Colors.white70, offset: Offset(0, 1))])), textDirection: TextDirection.ltr)..layout();
         tp.paint(canvas, Offset(cellCenter.dx - tp.width / 2, cellCenter.dy - tp.height / 2));
       }
     }
