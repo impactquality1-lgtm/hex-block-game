@@ -140,10 +140,10 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
     _clearPlayer.dispose();
     super.dispose();
   }
-  Uint8List _clearSoundWav(bool combo) {
+  Uint8List _clearSoundWav(int lines) {
     const sampleRate = 22050;
     const noteSeconds = 0.14;
-    final notes = combo ? [523.25, 659.25, 783.99, 1046.50, 1318.51] : [523.25, 659.25, 783.99, 1046.50];
+    final notes = lines >= 3 ? [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00, 2637.00] : lines == 2 ? [523.25, 659.25, 783.99, 1046.50, 1318.51] : [523.25, 659.25, 783.99, 1046.50];
     final samplesPerNote = (sampleRate * noteSeconds).round();
     final pcm = <int>[];
     for (var n = 0; n < notes.length; n++) {
@@ -179,9 +179,9 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
     header.setUint32(40, dataSize, Endian.little);
     return Uint8List.fromList([...header.buffer.asUint8List(), ...pcm]);
   }
-  Future<void> _playClearSound(bool combo) async {
+  Future<void> _playClearSound(int lines) async {
     try {
-      await _clearPlayer.play(BytesSource(_clearSoundWav(combo)));
+      await _clearPlayer.play(BytesSource(_clearSoundWav(lines)));
     } catch (_) {}
   }
   int? selectedTrayIndex;
@@ -281,6 +281,27 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
     _place(trayIndex, anchor);
   }
 
+  Widget _bubbleLetters(String text, double t, {required double fontSize, required Color color}) {
+    final letters = <Widget>[];
+    for (var i = 0; i < text.length; i++) {
+      final ch = text[i];
+      if (ch == ' ') { letters.add(SizedBox(width: fontSize * 0.35)); continue; }
+      final local = ((t - 0.05 - i * 0.04) / 0.35).clamp(0.0, 1.0);
+      final scale = Curves.elasticOut.transform(local);
+      letters.add(Transform.scale(scale: scale, child: Stack(children: [Text(ch, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w900, foreground: Paint()..style = PaintingStyle.stroke..strokeWidth = fontSize * 0.16..strokeJoin = StrokeJoin.round..color = Colors.black87)), Text(ch, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w900, color: color, shadows: const [Shadow(blurRadius: 8, color: Colors.black54, offset: Offset(0, 2))]))])));
+    }
+    return Row(mainAxisSize: MainAxisSize.min, children: letters);
+  }
+  List<Widget> _burstStars(double t, int count, double maxRadius) {
+    final colors = [Colors.amber, Colors.pinkAccent, Colors.cyanAccent, Colors.lightGreenAccent, Colors.orangeAccent, Colors.purpleAccent];
+    final widgets = <Widget>[];
+    for (var i = 0; i < count; i++) {
+      final angle = (2 * math.pi * i) / count;
+      final radius = 40 + t * maxRadius;
+      widgets.add(Transform.translate(offset: Offset(radius * math.cos(angle), radius * math.sin(angle)), child: Opacity(opacity: (1.0 - t).clamp(0.0, 1.0), child: Icon(Icons.star, color: colors[i % colors.length], size: 18 + (i % 3) * 4))));
+    }
+    return widgets;
+  }
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -372,20 +393,36 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                 child: AnimatedBuilder(
                   animation: _clearController,
                   builder: (context, child) {
-                    return Opacity(
-                      opacity: _clearOpacity.value,
-                      child: Transform.scale(
-                        scale: _clearScale.value,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.star, color: Colors.amber, size: 32), SizedBox(width: 4), Icon(Icons.star, color: Colors.amber, size: 40), SizedBox(width: 4), Icon(Icons.star, color: Colors.amber, size: 32)]),
-                            const SizedBox(height: 4),
-                            Text('+${game.clearingPoints}', style: TextStyle(fontSize: 56, fontWeight: FontWeight.w900, color: Colors.amber.shade300, shadows: const [Shadow(blurRadius: 12, color: Colors.black87, offset: Offset(0, 3))])),
-                            Text(game.clearingLines > 1 ? 'Combo! ${game.clearingLines} lines!' : 'Line cleared!', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))])),
-                          ],
+                    final t = _clearController.value;
+                    final lines = game.clearingLines;
+                    final message = lines > 1 ? 'Combo! $lines lines!' : 'Line cleared!';
+                    final starCount = lines >= 3 ? 7 : lines == 2 ? 5 : 3;
+                    final rainbow = [Colors.amber, Colors.pinkAccent, Colors.cyanAccent, Colors.lightGreenAccent, Colors.orangeAccent, Colors.purpleAccent, Colors.yellowAccent];
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (lines >= 3) ..._burstStars(t, 12, 110),
+                        if (lines == 2) ..._burstStars(t, 6, 70),
+                        Opacity(
+                          opacity: _clearOpacity.value,
+                          child: Transform.scale(
+                            scale: _clearScale.value,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (lines >= 3) _bubbleLetters('TRIPLE!', t, fontSize: 40, color: Colors.pinkAccent),
+                                if (lines == 2) _bubbleLetters('DOUBLE!', t, fontSize: 36, color: Colors.orangeAccent),
+                                const SizedBox(height: 6),
+                                Row(mainAxisSize: MainAxisSize.min, children: [for (var i = 0; i < starCount; i++) Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: Icon(Icons.star, color: lines >= 3 ? rainbow[i % 7] : Colors.amber, size: i == starCount ~/ 2 ? 40 : 32))]),
+                                const SizedBox(height: 4),
+                                Text('+${game.clearingPoints}', style: TextStyle(fontSize: lines >= 3 ? 72 : 56, fontWeight: FontWeight.w900, color: Colors.amber.shade300, shadows: const [Shadow(blurRadius: 12, color: Colors.black87, offset: Offset(0, 3))])),
+                                const SizedBox(height: 6),
+                                _bubbleLetters(message, t, fontSize: 26, color: Colors.white),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     );
                   },
                 ),
