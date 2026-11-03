@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'words.dart';
+
 /// Axial coordinates for a pointy-top hex grid (see redblobgames.com).
 /// The third cube coordinate is always s = -q - r.
 class Axial {
@@ -54,9 +56,10 @@ List<List<Axial>> boardLines(List<Axial> cells) {
 class Piece {
   final List<Axial> cells;
   final int color;
-  const Piece(this.cells, this.color);
+  final List<String> letters;
+  const Piece(this.cells, this.color, [this.letters = const []]);
   Piece rotate60() {
-    return Piece(cells.map((c) => Axial(-c.r, c.q + c.r)).toList(), color);
+    return Piece(cells.map((c) => Axial(-c.r, c.q + c.r)).toList(), color, letters);
   }
 }
 
@@ -89,6 +92,12 @@ List<Piece> allPieces(int color) {
 }
 
 /// Game state: board contents, tray, score, and the rules for placing.
+class WordScore {
+  final String word;
+  final int points;
+  final List<Axial> cells;
+  const WordScore(this.word, this.points, this.cells);
+}
 class HexGame {
   static const int radius = 4;
   final List<Axial> cells = boardCells(radius);
@@ -96,6 +105,9 @@ class HexGame {
 
   /// Board contents: cell -> colour index, or absent when empty.
   final Map<Axial, int> board = {};
+  final Map<Axial, String> letters = {};
+  List<WordScore> foundWords = [];
+  final Set<String> scoredWordKeys = {};
   List<Piece?> tray = [null, null, null];
   int score = 0;
   int linesCleared = 0;
@@ -118,6 +130,9 @@ class HexGame {
 
   void newGame() {
     board.clear();
+    letters.clear();
+    foundWords = [];
+    scoredWordKeys.clear();
     score = 0;
     linesCleared = 0;
     gameOver = false;
@@ -137,7 +152,7 @@ class HexGame {
       } else {
         shape = pool[_random.nextInt(pool.length - 1)];
       }
-      tray[i] = Piece(shape.cells, _random.nextInt(6));
+      tray[i] = Piece(shape.cells, _random.nextInt(6), List.generate(shape.cells.length, (_) => _randomLetter()));
     }
     _checkGameOver();
   }
@@ -154,6 +169,56 @@ class HexGame {
       gameOver = false;
       if (message == 'No moves left!') message = null;
     }
+  }
+  String _randomLetter() {
+    const pool = 'EEEEEEEEEEEEAAAAAAAAAIIIIIIIIOOOOOOOOONNNNNNRRRRRRTTTTTTLLLLSSSSUUUUDDDDGGGBBCCMMPPFFHHVVWWYYKJXQZ';
+    return pool[_random.nextInt(pool.length)];
+  }
+  int _wordPoints(int length) {
+    switch (length) {
+      case 3: return 30;
+      case 4: return 50;
+      case 5: return 80;
+      case 6: return 120;
+      default: return 150;
+    }
+  }
+  List<WordScore> _findWords(List<Axial> newCells) {
+    const dirs = [Axial(0, 1), Axial(1, 0), Axial(1, -1)];
+    final newSet = newCells.toSet();
+    final seenSegments = <String>{};
+    final results = <WordScore>[];
+    for (var d = 0; d < dirs.length; d++) {
+      final step = dirs[d];
+      final back = Axial(-step.q, -step.r);
+      for (final newCell in newCells) {
+        var start = newCell;
+        while (board.containsKey(start + back)) start = start + back;
+        if (!seenSegments.add('$d:${start.q},${start.r}')) continue;
+        final segCells = <Axial>[];
+        var cur = start;
+        while (board.containsKey(cur)) { segCells.add(cur); cur = cur + step; }
+        if (segCells.length < 3) continue;
+        final segStr = segCells.map((c) => letters[c] ?? '').join();
+        for (var len = segStr.length; len >= 3; len--) {
+          var found = false;
+          for (var i = 0; i + len <= segStr.length; i++) {
+            final subCells = segCells.sublist(i, i + len);
+            if (!subCells.any(newSet.contains)) continue;
+            final word = segStr.substring(i, i + len).toLowerCase();
+            if (!englishWords.contains(word)) continue;
+            final key = '${segCells[i].q},${segCells[i].r}:$d:$len:$word';
+            if (scoredWordKeys.contains(key)) continue;
+            scoredWordKeys.add(key);
+            results.add(WordScore(word, _wordPoints(len), subCells));
+            found = true;
+            break;
+          }
+          if (found) break;
+        }
+      }
+    }
+    return results;
   }
   bool canPlace(Piece piece, Axial anchor) {
     for (final offset in piece.cells) {
@@ -179,15 +244,22 @@ class HexGame {
   /// can animate them, and the caller must call [finishClear] when the
   /// animation ends. Input should be ignored while [isClearing] is true.
   bool place(int trayIndex, Axial anchor) {
+    foundWords = [];
     final piece = tray[trayIndex];
     if (piece == null || gameOver || isClearing || !canPlace(piece, anchor)) {
       return false;
     }
-    for (final offset in piece.cells) {
-      board[anchor + offset] = piece.color;
+    final placedCells = <Axial>[];
+    for (var i = 0; i < piece.cells.length; i++) {
+      final cell = anchor + piece.cells[i];
+      placedCells.add(cell);
+      board[cell] = piece.color;
+      letters[cell] = piece.letters.length == piece.cells.length ? piece.letters[i] : '?';
     }
     score += piece.cells.length;
     tray[trayIndex] = null;
+    foundWords = _findWords(placedCells);
+    for (final word in foundWords) score += word.points;
     final cleared = <Axial>{};
     var linesHit = 0;
     for (final line in lines) {
@@ -219,6 +291,7 @@ class HexGame {
     if (clearingCells.isEmpty) return;
     for (final cell in clearingCells) {
       board.remove(cell);
+      letters.remove(cell);
     }
     linesCleared += clearingLines;
     clearingCells = {};

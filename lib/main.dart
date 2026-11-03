@@ -184,6 +184,9 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       await _clearPlayer.play(BytesSource(_clearSoundWav(lines)));
     } catch (_) {}
   }
+  List<WordScore> _wordBanner = [];
+  bool _wordBannerVisible = false;
+  int _wordBannerId = 0;
   int? selectedTrayIndex;
   int? draggingTrayIndex;
   Offset? dragPosition;
@@ -254,6 +257,12 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       selectedTrayIndex = null;
       if (cleared && game.gameOver && game.score > best) best = game.score;
     });
+    if (game.foundWords.isNotEmpty) {
+      final bannerId = ++_wordBannerId;
+      setState(() { _wordBanner = List.of(game.foundWords); _wordBannerVisible = true; });
+      Future.delayed(const Duration(milliseconds: 1400), () { if (!mounted || bannerId != _wordBannerId) return; setState(() { _wordBannerVisible = false; }); });
+      Future.delayed(const Duration(milliseconds: 1900), () { if (!mounted || bannerId != _wordBannerId) return; setState(() { _wordBanner = []; }); });
+    }
     if (cleared && game.isClearing) {
       final animMs = game.clearingLines >= 3 ? 1400 : game.clearingLines == 2 ? 1200 : 950;
       _clearController.duration = Duration(milliseconds: animMs);
@@ -429,6 +438,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                 ),
               ),
             ),
+          if (_wordBanner.isNotEmpty)
+            IgnorePointer(child: Align(alignment: const Alignment(0, 0.55), child: AnimatedOpacity(opacity: _wordBannerVisible ? 1.0 : 0.0, duration: const Duration(milliseconds: 400), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('WORD BONUS!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.lightGreenAccent, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))])), for (final word in _wordBanner) Text('${word.word.toUpperCase()}  +${word.points}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 8, color: Colors.black87, offset: Offset(0, 2))]))])))),
           if (game.gameOver)
             Container(
               color: Colors.black54,
@@ -537,6 +548,11 @@ class _BoardPainter extends CustomPainter {
           cellSize = layout.size * (0.92 + 0.12 * pulse);
         }
         canvas.drawPath(_hexPath(cellCenter, cellSize), Paint()..color = color);
+        final letter = game.letters[cell];
+        if (letter != null) {
+          final tp = TextPainter(text: TextSpan(text: letter, style: TextStyle(fontSize: layout.size * 0.85, fontWeight: FontWeight.bold, color: Colors.white, shadows: const [Shadow(blurRadius: 2, color: Colors.black54, offset: Offset(0, 1))])), textDirection: TextDirection.ltr)..layout();
+          tp.paint(canvas, Offset(cellCenter.dx - tp.width / 2, cellCenter.dy - tp.height / 2));
+        }
       } else {
         canvas.drawPath(_hexPath(cellCenter, layout.size * 0.92), emptyFill);
         canvas.drawPath(_hexPath(cellCenter, layout.size * 0.92), emptyStroke);
@@ -577,10 +593,15 @@ class _PiecePainter extends CustomPainter {
     }
     final offset = Offset(size.width / 2 - (minX + maxX) / 2, size.height / 2 - (minY + maxY) / 2);
     final paint = Paint()..color = pieceColors[piece.color % pieceColors.length];
-    for (final cell in piece.cells) {
+    for (var i = 0; i < piece.cells.length; i++) {
+      final cell = piece.cells[i];
       final p = layout.toPixel(cell);
       final cellCenter = Offset(offset.dx + p.x, offset.dy + p.y);
       canvas.drawPath(_hexPath(cellCenter, hexSize * 0.92), paint);
+      if (piece.letters.length == piece.cells.length) {
+        final tp = TextPainter(text: TextSpan(text: piece.letters[i], style: TextStyle(fontSize: hexSize * 0.85, fontWeight: FontWeight.bold, color: Colors.white, shadows: const [Shadow(blurRadius: 2, color: Colors.black54, offset: Offset(0, 1))])), textDirection: TextDirection.ltr)..layout();
+        tp.paint(canvas, Offset(cellCenter.dx - tp.width / 2, cellCenter.dy - tp.height / 2));
+      }
     }
   }
   @override
