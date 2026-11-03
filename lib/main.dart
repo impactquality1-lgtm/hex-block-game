@@ -583,11 +583,15 @@ class _BoardPainter extends CustomPainter {
     }
     if (ghostAnchor != null && ghostPiece != null && ghostValid) {
       final ghostPaint = Paint()..color = pieceColors[ghostPiece!.color % pieceColors.length].withOpacity(0.55);
-      for (final offset in ghostPiece!.cells) {
-        final cell = ghostAnchor! + offset;
+      for (var i = 0; i < ghostPiece!.cells.length; i++) {
+        final cell = ghostAnchor! + ghostPiece!.cells[i];
         final p = layout.toPixel(cell);
         final cellCenter = Offset(center.dx + p.x, center.dy + p.y);
         canvas.drawPath(_hexPath(cellCenter, layout.size * 0.92), ghostPaint);
+        if (ghostPiece!.letters.length == ghostPiece!.cells.length) {
+          final tp = TextPainter(text: TextSpan(text: ghostPiece!.letters[i], style: TextStyle(fontSize: layout.size * 0.85, fontWeight: FontWeight.bold, color: Colors.black.withOpacity(0.8), shadows: const [Shadow(blurRadius: 2, color: Colors.white54, offset: Offset(0, 1))])), textDirection: TextDirection.ltr)..layout();
+          tp.paint(canvas, Offset(cellCenter.dx - tp.width / 2, cellCenter.dy - tp.height / 2));
+        }
       }
     }
   }
