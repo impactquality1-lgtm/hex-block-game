@@ -334,7 +334,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                 },
               ),
               const SizedBox(height: 12),
-              const Text('Drag a piece onto the board, or tap a piece then tap a cell.', style: TextStyle(color: Colors.white70)),
+              const Text('Drag a piece onto the board, tap a piece then tap a cell, or double-tap a piece to rotate it.', style: TextStyle(color: Colors.white70)),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -431,6 +431,10 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       onTap: () {
         if (piece == null) return;
         setState(() { selectedTrayIndex = selected ? null : index; });
+      },
+      onDoubleTap: () {
+        if (piece == null) return;
+        setState(() { game.rotateTrayPiece(index); });
       },
       onPanStart: (details) {
         if (piece == null) return;

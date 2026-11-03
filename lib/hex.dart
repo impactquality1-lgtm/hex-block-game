@@ -55,6 +55,9 @@ class Piece {
   final List<Axial> cells;
   final int color;
   const Piece(this.cells, this.color);
+  Piece rotate60() {
+    return Piece(cells.map((c) => Axial(-c.r, c.q + c.r)).toList(), color);
+  }
 }
 
 Piece _shape(List<List<int>> offsets, int color) {
@@ -139,6 +142,19 @@ class HexGame {
     _checkGameOver();
   }
 
+  void rotateTrayPiece(int trayIndex) {
+    final piece = tray[trayIndex];
+    if (piece == null || isClearing) return;
+    tray[trayIndex] = piece.rotate60();
+    final remaining = tray.whereType<Piece>().toList();
+    if (remaining.isNotEmpty && remaining.every((p) => !fitsAnywhere(p))) {
+      gameOver = true;
+      message = 'No moves left!';
+    } else {
+      gameOver = false;
+      if (message == 'No moves left!') message = null;
+    }
+  }
   bool canPlace(Piece piece, Axial anchor) {
     for (final offset in piece.cells) {
       final cell = anchor + offset;
