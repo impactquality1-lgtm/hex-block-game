@@ -255,9 +255,11 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       if (cleared && game.gameOver && game.score > best) best = game.score;
     });
     if (cleared && game.isClearing) {
-      _playClearSound(game.clearingLines > 1);
+      final animMs = game.clearingLines >= 3 ? 1400 : game.clearingLines == 2 ? 1200 : 950;
+      _clearController.duration = Duration(milliseconds: animMs);
+      _playClearSound(game.clearingLines);
       _clearController.forward(from: 0);
-      Future.delayed(const Duration(milliseconds: 950), () {
+      Future.delayed(Duration(milliseconds: animMs), () {
         if (!mounted || !game.isClearing) return;
         setState(() {
           game.finishClear();
