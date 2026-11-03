@@ -61,7 +61,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   }
   Widget _splashPopup(double t, double start, Alignment alignment, String text) {
     final local = ((t - start) / 0.22).clamp(0.0, 1.0);
-    final opacity = local < 0.7 ? 1.0 : 1.0 - (local - 0.7) / 0.3;
+    final opacity = (local < 0.7 ? 1.0 : 1.0 - (local - 0.7) / 0.3).clamp(0.0, 1.0);
     final scale = Curves.easeOutBack.transform(local);
     return Align(alignment: alignment, child: Opacity(opacity: opacity, child: Transform.scale(scale: scale, child: Text(text, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.amber, shadows: [Shadow(blurRadius: 12, color: Colors.black54, offset: Offset(0, 2))])))));
   }
@@ -282,8 +282,10 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    _boardWidth = screenWidth - 32;
-    _boardHexSize = _boardWidth / 16;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final availableHeight = (screenHeight - 320).clamp(200.0, double.infinity);
+    _boardHexSize = math.min((screenWidth - 32) / 16, availableHeight / 15);
+    _boardWidth = _boardHexSize * 16;
     final boardHeight = _boardHexSize * 15;
     final draggingPiece = draggingTrayIndex != null ? game.tray[draggingTrayIndex!] : null;
     return Scaffold(
