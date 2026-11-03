@@ -23,7 +23,7 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-      - run: flutter build web --release --base-href /hex-block-game/
+      - run: flutter build web --release --pwa-strategy=none --base-href /hex-block-game/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
