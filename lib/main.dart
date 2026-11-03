@@ -43,7 +43,7 @@ class SplashPage extends StatefulWidget {
   State<SplashPage> createState() => _SplashPageState();
 }
 class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 4800));
   final AudioPlayer _splashPlayer = AudioPlayer();
   bool _navigated = false;
   @override
@@ -51,13 +51,19 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     super.initState();
     _splashPlayer.play(BytesSource(buildChimeWav([261.63, 329.63, 392.00, 523.25, 659.25, 783.99], noteSeconds: 0.16))).catchError((_) {});
     _controller.forward();
-    Future.delayed(const Duration(milliseconds: 2400), _goToGame);
+    Future.delayed(const Duration(milliseconds: 4800), _goToGame);
   }
   @override
   void dispose() {
     _splashPlayer.dispose();
     _controller.dispose();
     super.dispose();
+  }
+  Widget _splashPopup(double t, double start, Alignment alignment, String text) {
+    final local = ((t - start) / 0.22).clamp(0.0, 1.0);
+    final opacity = local < 0.7 ? 1.0 : 1.0 - (local - 0.7) / 0.3;
+    final scale = Curves.easeOutBack.transform(local);
+    return Align(alignment: alignment, child: Opacity(opacity: opacity, child: Transform.scale(scale: scale, child: Text(text, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.amber, shadows: [Shadow(blurRadius: 12, color: Colors.black54, offset: Offset(0, 2))])))));
   }
   void _goToGame() {
     if (!mounted || _navigated) return;
@@ -78,8 +84,10 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
             final titleScale = Curves.elasticOut.transform((t * 1.8).clamp(0.0, 1.0));
             final hexScale = Curves.elasticOut.transform(((t - 0.15) * 1.6).clamp(0.0, 1.0));
             final subOpacity = ((t - 0.45) * 2.5).clamp(0.0, 1.0);
-            return Center(
-              child: Column(
+            return Stack(
+              children: [
+                Center(
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Transform.scale(scale: hexScale, child: SizedBox(width: 150, height: 150, child: CustomPaint(painter: _PiecePainter(hexPiece, 20)))),
@@ -91,6 +99,12 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                   const Text('Tap to skip', style: TextStyle(color: Colors.white38, fontSize: 13)),
                 ],
               ),
+                ),
+                _splashPopup(t, 0.12, const Alignment(-0.65, -0.65), '+100'),
+                _splashPopup(t, 0.32, const Alignment(0.65, -0.35), 'Combo! 2 lines!'),
+                _splashPopup(t, 0.52, const Alignment(-0.6, 0.45), '+250'),
+                _splashPopup(t, 0.72, const Alignment(0.6, 0.65), '+100'),
+              ],
             );
           },
         ),
