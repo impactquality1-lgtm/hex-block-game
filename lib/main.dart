@@ -314,6 +314,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hex Blocks'),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -359,7 +360,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
                 },
               ),
               const SizedBox(height: 12),
-              const Text('Drag a piece onto the board, tap a piece then tap a cell, or double-tap a piece to rotate it.', style: TextStyle(color: Colors.white70)),
+              const Text('Drag a piece onto the board, tap a piece then tap a cell. Only the middle piece (blue outline) can rotate — double-tap it.', style: TextStyle(color: Colors.white70)),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -474,7 +475,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
         setState(() { selectedTrayIndex = selected ? null : index; });
       },
       onDoubleTap: () {
-        if (piece == null) return;
+        if (piece == null || index != 1) return;
         setState(() { game.rotateTrayPiece(index); });
       },
       onPanStart: (details) {
@@ -489,12 +490,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
         ghostAnchor = null;
         ghostValid = false;
       }),
-      child: Container(
-        width: 100,
-        height: 100,
-        decoration: BoxDecoration(border: Border.all(color: selected ? Colors.white : Colors.white24, width: selected ? 2 : 1), borderRadius: BorderRadius.circular(12)),
-        child: Opacity(opacity: dragging ? 0.25 : 1, child: piece == null ? const SizedBox.shrink() : CustomPaint(painter: _PiecePainter(piece, 13))),
-      ),
+      child: index == 1 ? Container(width: 100, height: 100, decoration: BoxDecoration(border: Border.all(color: Colors.blueAccent, width: 3), borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.all(4), child: Container(decoration: BoxDecoration(border: Border.all(color: Colors.blueAccent, width: 1), borderRadius: BorderRadius.circular(8), color: selected ? Colors.white10 : null), child: Opacity(opacity: dragging ? 0.25 : 1, child: piece == null ? const SizedBox.shrink() : CustomPaint(painter: _PiecePainter(piece, 13))))) : Container(width: 100, height: 100, decoration: BoxDecoration(border: Border.all(color: selected ? Colors.white : Colors.white24, width: selected ? 2 : 1), borderRadius: BorderRadius.circular(12)), child: Opacity(opacity: dragging ? 0.25 : 1, child: piece == null ? const SizedBox.shrink() : CustomPaint(painter: _PiecePainter(piece, 13)))),
     );
   }
 }
